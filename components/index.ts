@@ -5,3 +5,5 @@ export * from "./Footer";
 export * from "./LayoutWrapper";
 export * from "./QRScannerModal";
 export * from "./UploadCertificateModal";
+export * from "./VerifiedCertificateCard";
+export * from "./SearchVerificationModal";

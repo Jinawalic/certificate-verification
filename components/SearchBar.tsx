@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
-import { Search, QrCode, ArrowRight, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
-import { QRScannerModal } from "./QRScannerModal";
+import { Search, ArrowRight, AlertCircle } from "lucide-react";
+import { SearchVerificationModal } from "./SearchVerificationModal";
 
 export interface SearchBarProps {
   /** Initial certificate number value if any */
@@ -21,22 +20,13 @@ export interface SearchBarProps {
 export const SearchBar: React.FC<SearchBarProps> = ({
   initialValue = "",
   placeholder = "FT/2023/2024/2543",
-  verificationBaseRoute = "/verify",
   onSearch,
-  showQuickSamples = true,
 }) => {
-  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState(initialValue);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-
-  // Curated demo certificate IDs for testing the system
-  const sampleCertificates = [
-    { label: "B.Sc Computer Science", id: "NSUK/2023/BSC/1049" },
-    { label: "LL.B Law", id: "NSUK/2022/LLB/0412" },
-    { label: "M.Sc Business Admin", id: "NSUK/2021/MSC/0083" },
-  ];
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [verifiedRecord, setVerifiedRecord] = useState<string>("");
 
   const handleExecuteSearch = (idToSearch: string) => {
     const trimmed = idToSearch.trim();
@@ -46,24 +36,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       return;
     }
 
-    if (trimmed.length < 4) {
-      setErrorMessage("Certificate number appears too short. Please review and try again.");
-      return;
-    }
-
     setErrorMessage(null);
     setIsLoading(true);
 
     const prefix = "NSUK/SR";
-    const cleanedTerm = trimmed.startsWith(prefix) ? trimmed : `${prefix}/${trimmed.replace(/^\//, '')}`;
+    const cleanedTerm = trimmed.startsWith(prefix)
+      ? trimmed
+      : `${prefix}/${trimmed.replace(/^\//, "")}`;
 
     if (onSearch) {
       onSearch(cleanedTerm);
     }
 
-    // Dynamic redirection to verification route
-    const encodedId = encodeURIComponent(cleanedTerm.replace(/\//g, "-"));
-    router.push(`${verificationBaseRoute}/${encodedId}`);
+    setTimeout(() => {
+      setIsLoading(false);
+      setVerifiedRecord(cleanedTerm);
+      setIsModalOpen(true);
+    }, 300);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -71,29 +60,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     handleExecuteSearch(searchTerm);
   };
 
-  const handleSampleClick = (id: string) => {
-    setSearchTerm(id);
-    handleExecuteSearch(id);
-  };
-
-  const handleQrDetected = (detectedId: string) => {
-    setSearchTerm(detectedId);
-    handleExecuteSearch(detectedId);
-  };
-
   return (
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
       {/* Clean Card Container */}
-      <div className="relative rounded-2xl bg-white p-4 sm:p-6 ring-1 ring-emerald-900/10 transition-all">
-
+      <div className="relative rounded-2xl bg-white p-4 sm:p-6 ring-1 ring-emerald-900/10 transition-all shadow-xs">
         {/* Input Form */}
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             {/* Input Field with NSUK/SR Prefix */}
-            <div className={`relative flex-1 flex items-center rounded-xl border bg-slate-50/50 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-700 ${errorMessage
-                ? "border-red-400 focus-within:border-red-500 focus-within:ring-red-200"
-                : "border-slate-200 focus-within:border-emerald-700"
-              }`}>
+            <div
+              className={`relative flex-1 flex items-center rounded-xl border bg-slate-50/50 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-700 ${
+                errorMessage
+                  ? "border-red-400 focus-within:border-red-500 focus-within:ring-red-200"
+                  : "border-slate-200 focus-within:border-emerald-700"
+              }`}
+            >
               <div className="pointer-events-none flex items-center pl-4 text-slate-400">
                 <Search className="h-5 w-5 text-emerald-800/60" />
               </div>
@@ -117,12 +98,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
-
-              {/* Search / Verify Button */}
               <button
                 type="submit"
                 disabled={isLoading}
-                className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-1 disabled:opacity-70 disabled:cursor-not-allowed shrink-0"
+                className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-1 disabled:opacity-70 disabled:cursor-not-allowed shrink-0 cursor-pointer"
               >
                 {isLoading ? (
                   <>
@@ -149,11 +128,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </form>
       </div>
 
-      {/* QR Scanner Modal */}
-      <QRScannerModal
-        isOpen={isQrModalOpen}
-        onClose={() => setIsQrModalOpen(false)}
-        onCertificateDetected={handleQrDetected}
+      {/* Identical Verification Modal Pop-up on Search */}
+      <SearchVerificationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        certificateNumber={verifiedRecord}
+        onSearchAnother={() => {
+          setSearchTerm("");
+        }}
       />
     </div>
   );

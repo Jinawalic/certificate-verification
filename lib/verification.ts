@@ -20,6 +20,21 @@ export interface VerifiedCertificate {
 }
 
 export const MOCK_CERTIFICATE_REGISTRY: Record<string, VerifiedCertificate> = {
+  "NSUK-SR-FT-2023-2024-2543": {
+    certificateNumber: "NSUK/SR/FT/2023/2024/2543",
+    matricNumber: "NSUK/NAS/CSC/20/0912",
+    fullName: "Usman Danladi Mohammed",
+    faculty: "Faculty of Natural & Applied Sciences",
+    department: "Department of Computer Science",
+    degreeAwarded: "Bachelor of Science (B.Sc.) in Computer Science",
+    classOfDegree: "First Class Honours",
+    graduationYear: "2024",
+    dateOfIssue: "18th July 2024",
+    senateApprovalDate: "25th June 2024",
+    status: "VERIFIED",
+    cryptographicHash: "7d89ac023f990146e2098b182e04f260389de71b4c3b5d12a6582a93175ef102",
+    qrSignature: "NSUK-SEC-SHA256-USMANMOHAMMED-2024-VALIDATED",
+  },
   "NSUK-2023-BSC-1049": {
     certificateNumber: "NSUK/2023/BSC/1049",
     matricNumber: "NSUK/NAS/CSC/19/0421",
@@ -94,11 +109,11 @@ export function lookupCertificate(rawId: string): VerifiedCertificate {
     certificateNumber: displayId.startsWith("NSUK") ? displayId : `NSUK/${displayId}`,
     matricNumber: `NSUK/REC/${Math.floor(100000 + Math.random() * 900000)}`,
     fullName: "Verified Graduate Candidate",
-    faculty: "Faculty of Administration & Academic Sciences",
+    faculty: "Faculty of Natural & Applied Sciences",
     department: "Department of Academic Registry",
-    degreeAwarded: "Degree / Diploma Credential",
+    degreeAwarded: "Bachelor of Science (B.Sc.) Degree",
     classOfDegree: "Senate Certified Qualification",
-    graduationYear: "2023",
+    graduationYear: "2024",
     dateOfIssue: "Official Senate Register",
     senateApprovalDate: "Validated by University Registry",
     status: "VERIFIED",

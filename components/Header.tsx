@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Lock, ExternalLink, Menu, X, GraduationCap, Award } from "lucide-react";
+import { ShieldCheck, ExternalLink, Menu, X, Award } from "lucide-react";
+import { UploadCertificateModal } from "./UploadCertificateModal";
 
 export interface HeaderProps {
   /** Optional custom title or university branch */
@@ -19,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   verifyHref = "/",
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   return (
     <>
@@ -36,12 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="group flex items-center gap-3.5 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-2 rounded-lg py-1 px-1.5 transition-colors"
           >
             {/* University Crest / Emerald Icon */}
-            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-800 text-white shadow-md shadow-emerald-900/20 ring-1 ring-emerald-700 transition-transform group-hover:scale-105">
-              <ShieldCheck className="h-6 w-6 text-emerald-300" strokeWidth={2.2} />
-              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-emerald-950 shadow-sm">
-                N
-              </span>
-            </div>
+            <img src="/images/nsuklogo.png" alt="" className="h-11 w-11 shrink-0 rounded-xl" />
 
             {/* University Title & Subtitle */}
             <div className="flex flex-col">
@@ -56,13 +53,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href={verifyHref}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-900 hover:text-emerald-700 transition-colors px-2 py-1 rounded-md hover:bg-emerald-50/80"
+            <button
+              type="button"
+              onClick={() => setUploadModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-900 hover:text-emerald-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer border border-transparent hover:border-emerald-800/20"
             >
               <Award className="h-4 w-4 text-emerald-700" />
-              Verify Certificate
-            </Link>
+              <span>Verify Certificate</span>
+            </button>
 
             <a
               href="https://nsuk.edu.ng"
@@ -93,14 +91,17 @@ export const Header: React.FC<HeaderProps> = ({
         {mobileMenuOpen && (
           <div className="border-b border-emerald-900/10 bg-white px-4 pt-2 pb-6 shadow-xl md:hidden animate-in slide-in-from-top-2 duration-200">
             <div className="flex flex-col gap-3">
-              <Link
-                href={verifyHref}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-base font-semibold text-emerald-950 hover:bg-emerald-50"
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setUploadModalOpen(true);
+                }}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-base font-semibold text-emerald-950 hover:bg-emerald-50 text-left cursor-pointer"
               >
                 <Award className="h-5 w-5 text-emerald-700" />
                 <span>Verify Certificate</span>
-              </Link>
+              </button>
               <a
                 href="https://nsuk.edu.ng"
                 target="_blank"
@@ -114,6 +115,12 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
       </header>
+
+      {/* Upload Certificate Modal */}
+      <UploadCertificateModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+      />
     </>
   );
 };

@@ -2,14 +2,21 @@
 
 @layer base {
   :root {
-    --primary-institutional: #065f46; /* emerald-800 */
-    --primary-hover: #064e3b; /* emerald-900 */
-    --primary-light: #047857; /* emerald-700 */
-    --primary-subtle: #ecfdf5; /* emerald-50 */
-    --accent-gold: #d97706; /* amber-600 */
-    --accent-gold-light: #fef3c7; /* amber-100 */
-    
-    --bg-main: #f8fafc; /* slate-50 */
+    --primary-institutional: #065f46;
+    /* emerald-800 */
+    --primary-hover: #064e3b;
+    /* emerald-900 */
+    --primary-light: #047857;
+    /* emerald-700 */
+    --primary-subtle: #ecfdf5;
+    /* emerald-50 */
+    --accent-gold: #d97706;
+    /* amber-600 */
+    --accent-gold-light: #fef3c7;
+    /* amber-100 */
+
+    --bg-main: #f8fafc;
+    /* slate-50 */
     --bg-card: #ffffff;
     --border-subtle: #e2e8f0;
     --text-main: #0f172a;
@@ -20,7 +27,7 @@
 /* Custom subtle patterns for academic institutional credibility */
 .bg-academic-pattern {
   background-color: #f8fafc;
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(6, 95, 70, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(6, 95, 70, 0.06) 0px, transparent 50%),
     radial-gradient(at 50% 50%, rgba(217, 119, 6, 0.02) 0px, transparent 60%);
@@ -28,7 +35,7 @@
 
 .academic-grid-lines {
   background-size: 32px 32px;
-  background-image: 
+  background-image:
     linear-gradient(to right, rgba(6, 95, 70, 0.03) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(6, 95, 70, 0.03) 1px, transparent 1px);
 }

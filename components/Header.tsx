@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-900 hover:text-emerald-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-emerald-50 cursor-pointer border border-transparent hover:border-emerald-800/20"
             >
               <Award className="h-4 w-4 text-emerald-700" />
-              <span>Verify Certificate</span>
+              <span>Upload Certificate</span>
             </button>
 
             <a

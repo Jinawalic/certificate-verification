@@ -31,44 +31,53 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
   students,
   initialStudent = null,
 }) => {
+  // Only students with issued certificates can be printed
+  const issuedStudents = useMemo(() => {
+    return students.filter((s) => Boolean(s.certificateNumber));
+  }, [students]);
+
   // Department selection state
   const departments = useMemo(() => {
-    const set = new Set(students.map((s) => s.department).filter(Boolean));
+    const set = new Set(issuedStudents.map((s) => s.department).filter(Boolean));
     return ["All Departments", ...Array.from(set)];
-  }, [students]);
+  }, [issuedStudents]);
 
   const [selectedDepartment, setSelectedDepartment] = useState<string>("All Departments");
 
   // Filter students based on department
   const filteredStudents = useMemo(() => {
     if (selectedDepartment === "All Departments") {
-      return students;
+      return issuedStudents;
     }
-    return students.filter((s) => s.department === selectedDepartment);
-  }, [students, selectedDepartment]);
+    return issuedStudents.filter((s) => s.department === selectedDepartment);
+  }, [issuedStudents, selectedDepartment]);
 
   // Selected student state for printing
   const [selectedStudentCertNumber, setSelectedStudentCertNumber] = useState<string>(() => {
-    if (initialStudent) return initialStudent.certificateNumber;
-    return students[0]?.certificateNumber || "";
+    if (initialStudent?.certificateNumber) return initialStudent.certificateNumber;
+    return issuedStudents[0]?.certificateNumber || "";
   });
 
   // Preview student state (set after clicking "Preview")
   const [previewStudent, setPreviewStudent] = useState<VerifiedCertificate | null>(() => {
-    if (initialStudent) return initialStudent;
-    return students[0] || null;
+    if (initialStudent?.certificateNumber) return initialStudent;
+    return issuedStudents[0] || null;
   });
 
   // Zoom scale state for previewing 794x1123 A4 in modal
   const [zoomScale, setZoomScale] = useState<number>(0.68);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printStatusNotice, setPrintStatusNotice] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   // Sync when initialStudent changes
   React.useEffect(() => {
     if (initialStudent) {
       setSelectedDepartment(initialStudent.department || "All Departments");
-      setSelectedStudentCertNumber(initialStudent.certificateNumber);
+      setSelectedStudentCertNumber(initialStudent.certificateNumber || "");
       setPreviewStudent(initialStudent);
+      setPrintStatusNotice(null);
+      setPrintError(null);
     }
   }, [initialStudent]);
 
@@ -77,9 +86,9 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
   // Handle department change
   const handleDepartmentChange = (dept: string) => {
     setSelectedDepartment(dept);
-    const available = dept === "All Departments" ? students : students.filter((s) => s.department === dept);
+    const available = dept === "All Departments" ? issuedStudents : issuedStudents.filter((s) => s.department === dept);
     if (available.length > 0) {
-      setSelectedStudentCertNumber(available[0].certificateNumber);
+      setSelectedStudentCertNumber(available[0].certificateNumber || "");
     } else {
       setSelectedStudentCertNumber("");
     }
@@ -90,93 +99,119 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
     const found = students.find((s) => s.certificateNumber === selectedStudentCertNumber);
     if (found) {
       setPreviewStudent(found);
+      setPrintStatusNotice(null);
+      setPrintError(null);
     }
   };
 
-  // Handle Professional Print to PDF
-  const handlePrint = () => {
+  // Handle Professional Print to PDF with DB Logging
+  const handlePrint = async () => {
     if (!previewStudent) return;
     setIsPrinting(true);
+    setPrintError(null);
+    setPrintStatusNotice(null);
 
-    const certElem = document.getElementById("printable-statement-of-result");
-    if (!certElem) {
-      setIsPrinting(false);
-      return;
-    }
+    try {
+      // 1. Call backend API endpoint to validate & log print event in Senate database
+      const res = await fetch("/api/admin/certificates/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: previewStudent.id,
+          certificateNumber: previewStudent.certificateNumber,
+          matricNumber: previewStudent.matricNumber,
+        }),
+      });
 
-    // Create an isolated printing iframe
-    const printIframe = document.createElement("iframe");
-    printIframe.style.position = "fixed";
-    printIframe.style.right = "0";
-    printIframe.style.bottom = "0";
-    printIframe.style.width = "0";
-    printIframe.style.height = "0";
-    printIframe.style.border = "0";
-    document.body.appendChild(printIframe);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to authorize certificate print.");
+      }
 
-    const doc = printIframe.contentWindow?.document;
-    if (!doc) {
-      setIsPrinting(false);
-      return;
-    }
+      setPrintStatusNotice("Authorized & audit logged in Senate Registry.");
 
-    const title = `NSUK_Certificate_${previewStudent.matricNumber.replace(/[\/\\]/g, "-")}`;
+      const certElem = document.getElementById("printable-statement-of-result");
+      if (!certElem) {
+        throw new Error("Printable certificate DOM element not found.");
+      }
 
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>${title}</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0;
-            }
-            @media print {
-              html, body {
-                width: 210mm;
-                height: 297mm;
+      // 2. Create an isolated printing iframe
+      const printIframe = document.createElement("iframe");
+      printIframe.style.position = "fixed";
+      printIframe.style.right = "0";
+      printIframe.style.bottom = "0";
+      printIframe.style.width = "0";
+      printIframe.style.height = "0";
+      printIframe.style.border = "0";
+      document.body.appendChild(printIframe);
+
+      const doc = printIframe.contentWindow?.document;
+      if (!doc) {
+        throw new Error("Print driver could not initialize document buffer.");
+      }
+
+      const title = `NSUK_Certificate_${previewStudent.matricNumber.replace(/[\/\\]/g, "-")}`;
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${title}</title>
+            <style>
+              @page {
+                size: A4 portrait;
+                margin: 0;
+              }
+              @media print {
+                html, body {
+                  width: 210mm;
+                  height: 297mm;
+                  margin: 0;
+                  padding: 0;
+                  background: #ffffff;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                }
+              }
+              body {
                 margin: 0;
                 padding: 0;
-                background: #ffffff;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background-color: #ffffff;
+                font-family: "Times New Roman", Times, serif;
               }
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              background-color: #ffffff;
-              font-family: "Times New Roman", Times, serif;
-            }
-          </style>
-          <!-- Link to tailwind compiled styles from next.js -->
-          <link rel="stylesheet" href="/_next/static/css/app/layout.css" />
-        </head>
-        <body>
-          <div style="width: 794px; height: 1123px; position: relative;">
-            ${certElem.outerHTML}
-          </div>
-        </body>
-      </html>
-    `);
-    doc.close();
+            </style>
+            <!-- Link to tailwind compiled styles from next.js -->
+            <link rel="stylesheet" href="/_next/static/css/app/layout.css" />
+          </head>
+          <body>
+            <div style="width: 794px; height: 1123px; position: relative;">
+              ${certElem.outerHTML}
+            </div>
+          </body>
+        </html>
+      `);
+      doc.close();
 
-    printIframe.contentWindow?.focus();
-    setTimeout(() => {
-      printIframe.contentWindow?.print();
-      setIsPrinting(false);
+      printIframe.contentWindow?.focus();
       setTimeout(() => {
-        if (document.body.contains(printIframe)) {
-          document.body.removeChild(printIframe);
-        }
-      }, 2000);
-    }, 600);
+        printIframe.contentWindow?.print();
+        setIsPrinting(false);
+        setTimeout(() => {
+          if (document.body.contains(printIframe)) {
+            document.body.removeChild(printIframe);
+          }
+        }, 2000);
+      }, 600);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error preparing certificate print";
+      setPrintError(msg);
+      setIsPrinting(false);
+    }
   };
 
   // Format serial number cleanly from certificate number
@@ -255,7 +290,7 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
                   <option value="">No students in this department</option>
                 ) : (
                   filteredStudents.map((s) => (
-                    <option key={s.certificateNumber} value={s.certificateNumber}>
+                    <option key={s.certificateNumber || s.matricNumber} value={s.certificateNumber || ""}>
                       {s.fullName} ({s.matricNumber})
                     </option>
                   ))
@@ -296,6 +331,19 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
         {/* Certificate Preview Body Area */}
         <div className="flex-1 overflow-auto bg-slate-200/60 p-4 sm:p-6 flex flex-col items-center justify-start relative">
           
+          {/* Print Audit Status / Error Banners */}
+          {printStatusNotice && (
+            <div className="mb-3 inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-900 shadow-xs animate-in fade-in">
+              <Sparkles className="h-4 w-4 text-emerald-700 shrink-0" />
+              <span>{printStatusNotice}</span>
+            </div>
+          )}
+          {printError && (
+            <div className="mb-3 inline-flex items-center gap-2 rounded-xl border border-red-300 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 shadow-xs animate-in fade-in">
+              <span>{printError}</span>
+            </div>
+          )}
+
           {/* Zoom Controller Floating Bar */}
           {previewStudent && (
             <div className="sticky top-2 z-20 mb-4 inline-flex items-center gap-2 rounded-xl bg-slate-900/80 backdrop-blur-md px-3 py-1.5 text-xs text-white shadow-lg">
@@ -344,7 +392,7 @@ export const PrintCertificateModal: React.FC<PrintCertificateModalProps> = ({
                   degreeType={previewStudent.degreeAwarded}
                   degreeClass={previewStudent.classOfDegree}
                   issueDate={previewStudent.dateOfIssue || previewStudent.senateApprovalDate || "5th December, 2024"}
-                  serialNumber={formatSerialNumber(previewStudent.certificateNumber)}
+                  serialNumber={formatSerialNumber(previewStudent.certificateNumber || "")}
                 />
               </div>
             </div>

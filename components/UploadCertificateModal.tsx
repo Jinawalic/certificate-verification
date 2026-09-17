@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, DragEvent, ChangeEvent } from "react";
-import { useRouter } from "next/navigation";
 import {
   Upload,
   FileText,
@@ -12,9 +11,12 @@ import {
   AlertCircle,
   ShieldCheck,
   ArrowRight,
+  Camera,
+  RotateCcw,
   Sparkles
 } from "lucide-react";
-import { VerifiedCertificateCard } from "./VerifiedCertificateCard";
+import { CertificateDisplayCard } from "./CertificateDisplayCard";
+import { VerifiedCertificate } from "@/lib/verification";
 
 export interface UploadCertificateModalProps {
   isOpen: boolean;
@@ -27,16 +29,29 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
   onClose,
   onVerified,
 }) => {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
   const [progressStage, setProgressStage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Result state
+  const [verifiedCertificate, setVerifiedCertificate] = useState<VerifiedCertificate | null>(null);
+  const [matchReport, setMatchReport] = useState<{
+    confidence?: number;
+    matchedFields?: {
+      certificateNumber?: boolean;
+      matricNumber?: boolean;
+      fullName?: boolean;
+      degreeAwarded?: boolean;
+      classOfDegree?: boolean;
+    };
+    source?: "upload" | "camera";
+  } | null>(null);
 
   if (!isOpen) return null;
 
@@ -52,7 +67,8 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
 
   const processFile = (file: File) => {
     setErrorMessage(null);
-    setIsVerified(false);
+    setVerifiedCertificate(null);
+    setMatchReport(null);
 
     // Validate format
     const validTypes = [
@@ -64,13 +80,13 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
     ];
 
     if (!validTypes.includes(file.type)) {
-      setErrorMessage("Please upload a valid PDF document or image file (PNG, JPG, JPEG, WebP).");
+      setErrorMessage("Please upload a valid PDF document or certificate image (PNG, JPG, JPEG, WebP).");
       return;
     }
 
-    // Validate size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage("The uploaded file exceeds the 5MB limit. Please upload a smaller file.");
+    // Validate size (max 8MB)
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage("The uploaded file exceeds the 8MB limit. Please upload a smaller photo.");
       return;
     }
 
@@ -107,84 +123,127 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
     setSelectedFile(null);
     setPreviewUrl(null);
     setErrorMessage(null);
-    setIsVerified(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    setVerifiedCertificate(null);
+    setMatchReport(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const handleClose = () => {
-    setIsVerified(false);
     setIsVerifying(false);
     handleClearFile();
     onClose();
   };
 
-  const handleExecuteVerification = (certId = "NSUK-SR-FT-2023-2024-2543") => {
+  const handleExecuteVerification = async () => {
+    if (!selectedFile) {
+      setErrorMessage("Please select or snap a certificate file first.");
+      return;
+    }
+
     setErrorMessage(null);
     setIsVerifying(true);
-    setProgressStage("Verifying certificate document...");
+    setProgressStage("Reading certificate & performing OCR text scan...");
 
-    setTimeout(() => {
-      setIsVerifying(false);
-      setIsVerified(true);
-      if (onVerified) {
-        onVerified(certId);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      // Transition stages for pleasant UX
+      const stageTimer = setTimeout(() => {
+        setProgressStage("Cross-referencing details against Senate Central Register...");
+      }, 1500);
+
+      const res = await fetch("/api/verify/document", {
+        method: "POST",
+        body: formData,
+      });
+
+      clearTimeout(stageTimer);
+      const data = await res.json();
+
+      if (!res.ok || !data.success || !data.certificate) {
+        throw new Error(
+          data.error ||
+            "The certificate details could not be verified against the official university records."
+        );
       }
-    }, 600);
-  };
 
-  const handleUseSampleDocument = (fileName: string, certId: string) => {
-    // Simulate a mock uploaded file
-    const mockFile = new File(["NSUK Official Certificate Sample Document"], fileName, {
-      type: fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg",
-    });
-    setSelectedFile(mockFile);
-    setPreviewUrl(null);
-    setErrorMessage(null);
+      setVerifiedCertificate(data.certificate);
+      setMatchReport({
+        confidence: data.confidence || 98,
+        matchedFields: data.matchedFields,
+        source: "upload",
+      });
+
+      if (onVerified && data.certificate.id) {
+        onVerified(data.certificate.id);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Document verification failed.";
+      setErrorMessage(msg);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+      <div
+        className={`relative w-full rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10 overflow-hidden my-auto flex flex-col transition-all ${
+          verifiedCertificate ? "max-w-3xl max-h-[92vh]" : "max-w-xl"
+        }`}
+      >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-emerald-900 px-6 py-4 text-white">
+        <div className="flex items-center justify-between border-b border-emerald-900/10 bg-emerald-950 px-6 py-4 text-white shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-800 ring-1 ring-emerald-700 text-white shadow-xs">
               <FileCheck className="h-5 w-5 text-emerald-300" />
             </div>
             <div>
-              <h3 className="text-base font-bold">Verify Certificate Document</h3>
+              <h3 className="text-base font-bold">Verify Certificate Document or Photo</h3>
               <p className="text-xs text-emerald-200/80">
-                Upload scanned PDF or certificate image for instant verification
+                Automatic OCR & Senate Central Register Cross-Verification
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             disabled={isVerifying}
-            className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50"
+            className="rounded-lg p-1.5 text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50 cursor-pointer"
+            aria-label="Close modal"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6">
-          {isVerified ? (
-            <VerifiedCertificateCard
-              documentName={selectedFile?.name}
-              resetLabel="Upload Another"
-              onReset={() => {
-                setIsVerified(false);
-                handleClearFile();
-              }}
-              onClose={handleClose}
-            />
+        <div className="p-4 sm:p-6 overflow-y-auto">
+          {verifiedCertificate ? (
+            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                  Verification Result
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearFile}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-emerald-800 cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Verify Another Document</span>
+                </button>
+              </div>
+
+              <CertificateDisplayCard
+                certificate={verifiedCertificate}
+                matchReport={matchReport || undefined}
+              />
+            </div>
           ) : (
             <>
-              {/* Upload Drop Zone */}
+              {/* File Inputs (Standard File Browse & Direct Camera Capture) */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -192,34 +251,62 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
                 className="hidden"
                 onChange={handleFileChange}
               />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+              />
 
               {!selectedFile ? (
-                <div
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`cursor-pointer flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition-all ${dragActive
-                    ? "border-emerald-700 bg-emerald-50/70 scale-[0.99]"
-                    : "border-slate-300 bg-slate-50/60 hover:border-emerald-700 hover:bg-emerald-50/30"
+                <div className="space-y-3">
+                  {/* Upload Drop Zone */}
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`cursor-pointer flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition-all ${
+                      dragActive
+                        ? "border-emerald-700 bg-emerald-50/70 scale-[0.99]"
+                        : "border-slate-300 bg-slate-50/60 hover:border-emerald-700 hover:bg-emerald-50/30"
                     }`}
-                >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 mb-3 shadow-xs">
-                    <Upload className="h-7 w-7" />
+                  >
+                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 mb-3 shadow-xs">
+                      <Upload className="h-7 w-7" />
+                    </div>
+
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Click to browse or drag & drop certificate
+                    </h4>
+                    <p className="mt-1 text-xs text-slate-500 max-w-xs">
+                      Supports official NSUK certificates in PDF, PNG, JPG, or JPEG format (Up to 8MB)
+                    </p>
+
+                    <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-900 transition-colors">
+                      <FileText className="h-4 w-4" />
+                      <span>Browse Files</span>
+                    </div>
                   </div>
 
-                  <h4 className="text-sm font-bold text-slate-800">
-                    Click to browse or drag and drop certificate
-                  </h4>
-                  <p className="mt-1 text-xs text-slate-500 max-w-xs">
-                    Supports official NSUK certificates in PDF, PNG, JPG, or JPEG format (Up to 5MB)
-                  </p>
-
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-900 transition-colors">
-                    <FileText className="h-4 w-4" />
-                    <span>Select Document</span>
+                  {/* Camera Snap Option */}
+                  <div className="flex items-center gap-3">
+                    <div className="h-px bg-slate-200 flex-1" />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">or</span>
+                    <div className="h-px bg-slate-200 flex-1" />
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-full flex items-center justify-center gap-2.5 rounded-xl border border-emerald-800/30 bg-emerald-50/80 hover:bg-emerald-100/70 p-3.5 text-xs font-bold text-emerald-950 transition-all cursor-pointer shadow-xs"
+                  >
+                    <Camera className="h-4 w-4 text-emerald-800" />
+                    <span>Snap Certificate Photo with Camera</span>
+                  </button>
                 </div>
               ) : (
                 /* Selected File Preview Box */
@@ -243,7 +330,7 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
                         </p>
                         <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800">
                           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" />
-                          Document ready for verification
+                          Ready for OCR scan & Senate cross-check
                         </span>
                       </div>
                     </div>
@@ -252,7 +339,7 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
                       <button
                         type="button"
                         onClick={handleClearFile}
-                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors cursor-pointer"
                         title="Remove file"
                       >
                         <X className="h-4 w-4" />
@@ -262,11 +349,11 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
 
                   {/* Image Preview if applicable */}
                   {previewUrl && (
-                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200 max-h-40 bg-white flex items-center justify-center">
+                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 max-h-48 bg-white flex items-center justify-center p-2 shadow-inner">
                       <img
                         src={previewUrl}
                         alt="Certificate preview"
-                        className="max-h-40 object-contain"
+                        className="max-h-44 object-contain rounded"
                       />
                     </div>
                   )}
@@ -288,35 +375,46 @@ export const UploadCertificateModal: React.FC<UploadCertificateModalProps> = ({
                 </div>
               )}
 
-              {/* Validation Error */}
+              {/* Validation Error Banner */}
               {errorMessage && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700 border border-red-200 animate-in fade-in">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-                  <span>{errorMessage}</span>
+                <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-rose-50 p-3 text-xs font-medium text-rose-800 border border-rose-200 animate-in fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold">Verification Inconclusive</p>
+                    <p className="text-[11px] leading-relaxed text-rose-700">{errorMessage}</p>
+                  </div>
                 </div>
               )}
 
               {/* Security & Action Bar */}
-              <div className="mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                <div className="flex items-center gap-2 w-full sm:w-auto ml-auto">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    disabled={isVerifying}
-                    className="flex-1 sm:flex-initial rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isVerifying}
-                    onClick={() => handleExecuteVerification()}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    <span>Verify</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+              <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  disabled={isVerifying}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isVerifying || !selectedFile}
+                  onClick={handleExecuteVerification}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isVerifying ? (
+                    <>
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Scanning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Verify Document</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </>
+                  )}
+                </button>
               </div>
             </>
           )}

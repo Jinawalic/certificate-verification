@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, ChangeEvent, DragEvent } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, ChangeEvent, DragEvent } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -29,7 +29,9 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
-  Printer
+  Printer,
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import {
   Button,
@@ -40,161 +42,92 @@ import {
   UploadTemplateModal,
   PrintCertificateModal
 } from "@/components/admin";
+import { useRouter } from "next/navigation";
 import {
-  MOCK_CERTIFICATE_REGISTRY,
   VerifiedCertificate
 } from "@/lib/verification";
 
-const INITIAL_STUDENT_RECORDS: VerifiedCertificate[] = [
-  {
-    certificateNumber: "NSUK/SR-FT/2024/2025/1102",
-    matricNumber: "NSUK/NAS/CSC/20/1042",
-    fullName: "Ibrahim Danladi Musa",
-    faculty: "Faculty of Natural & Applied Sciences",
-    department: "Department of Computer Science",
-    degreeAwarded: "Bachelor of Science (B.Sc.) in Computer Science",
-    classOfDegree: "First Class Honours",
-    graduationYear: "2024",
-    dateOfIssue: "28th October 2024",
-    senateApprovalDate: "28th October 2024",
-    status: "VERIFIED",
-    cryptographicHash: "7d89ac023f990146e2098b182e04f260389de71b4c3b5d12a6582a93175ef102",
-    qrSignature: "NSUK-SEC-SHA256-IBRAHIMMUSA-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/SR-FT/2024/2025/1103",
-    matricNumber: "NSUK/LAW/CIL/19/0312",
-    fullName: "Fatima Aliyu Bello",
-    faculty: "Faculty of Law",
-    department: "Department of Common & Islamic Law",
-    degreeAwarded: "Bachelor of Laws (LL.B.)",
-    classOfDegree: "Second Class Honours (Upper Division)",
-    graduationYear: "2024",
-    dateOfIssue: "28th October 2024",
-    senateApprovalDate: "28th October 2024",
-    status: "VERIFIED",
-    cryptographicHash: "9a2f778d91b403487cbb9f182e04f260389de71b4c3b5d12a6582a93175ef320",
-    qrSignature: "NSUK-SEC-SHA256-FATIMABELLO-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/SR-FT/2024/2025/1104",
-    matricNumber: "NSUK/ADM/BUS/20/0541",
-    fullName: "Emmanuel Chukwudi Eze",
-    faculty: "Faculty of Administration & Business",
-    department: "Department of Business Administration",
-    degreeAwarded: "Bachelor of Science (B.Sc.) in Business Administration",
-    classOfDegree: "Second Class Honours (Upper Division)",
-    graduationYear: "2024",
-    dateOfIssue: "28th October 2024",
-    senateApprovalDate: "28th October 2024",
-    status: "VERIFIED",
-    cryptographicHash: "f1409d6c49832aa68b2011400e998273b5a176210f88927e1fba734891cc8461",
-    qrSignature: "NSUK-SEC-SHA256-EMMANUELEZE-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/SR-FT/2024/2025/1105",
-    matricNumber: "NSUK/FAS/BCH/20/0819",
-    fullName: "Zainab Abubakar Sadiq",
-    faculty: "Faculty of Natural & Applied Sciences",
-    department: "Department of Biochemistry",
-    degreeAwarded: "Bachelor of Science (B.Sc.) in Biochemistry",
-    classOfDegree: "First Class Honours",
-    graduationYear: "2024",
-    dateOfIssue: "28th October 2024",
-    senateApprovalDate: "28th October 2024",
-    status: "VERIFIED",
-    cryptographicHash: "8b7309ea873d6110f0b4d4582f12918e97a3f5509cba11928091dd72605f7781",
-    qrSignature: "NSUK-SEC-SHA256-ZAINABSADIQ-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/SR-FT/2024/2025/1106",
-    matricNumber: "NSUK/ENG/ELE/20/0174",
-    fullName: "Abubakar Abdurrahman Muhammad Dan-Kano Al-Hassan",
-    faculty: "Faculty of Engineering",
-    department: "Department of Electrical & Electronics Engineering",
-    degreeAwarded: "Bachelor of Engineering (B.Eng.) in Electrical Engineering",
-    classOfDegree: "First Class Honours",
-    graduationYear: "2024",
-    dateOfIssue: "28th October 2024",
-    senateApprovalDate: "28th October 2024",
-    status: "VERIFIED",
-    cryptographicHash: "4c118744b8989c93883a45c3b9b47e4b5e7d56637e163b27b8bfca73a8712a88",
-    qrSignature: "NSUK-SEC-SHA256-ABUBAKARALHASSAN-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/SR/FT/2023/2024/2543",
-    matricNumber: "NSUK/NAS/CSC/20/0912",
-    fullName: "Usman Danladi Mohammed",
-    faculty: "Faculty of Natural & Applied Sciences",
-    department: "Department of Computer Science",
-    degreeAwarded: "Bachelor of Science (B.Sc.) in Computer Science",
-    classOfDegree: "First Class Honours",
-    graduationYear: "2024",
-    dateOfIssue: "18th July 2024",
-    senateApprovalDate: "25th June 2024",
-    status: "VERIFIED",
-    cryptographicHash: "7d89ac023f990146e2098b182e04f260389de71b4c3b5d12a6582a93175ef102",
-    qrSignature: "NSUK-SEC-SHA256-USMANMOHAMMED-2024-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/2023/BSC/1049",
-    matricNumber: "NSUK/NAS/CSC/19/0421",
-    fullName: "Amina Ibrahim Danladi",
-    faculty: "Faculty of Natural & Applied Sciences",
-    department: "Department of Computer Science",
-    degreeAwarded: "Bachelor of Science (B.Sc.) in Computer Science",
-    classOfDegree: "First Class Honours",
-    graduationYear: "2023",
-    dateOfIssue: "14th November 2023",
-    senateApprovalDate: "28th October 2023",
-    status: "VERIFIED",
-    cryptographicHash: "9a2f778d91b403487cbb9f182e04f260389de71b4c3b5d12a6582a93175ef320",
-    qrSignature: "NSUK-SEC-SHA256-AMINADANLADI-2023-VALIDATED",
-  },
-  {
-    certificateNumber: "NSUK/2022/LLB/0412",
-    matricNumber: "NSUK/LAW/CIL/17/0219",
-    fullName: "Chukwudi Emmanuel Eze",
-    faculty: "Faculty of Law",
-    department: "Department of Common & Islamic Law",
-    degreeAwarded: "Bachelor of Laws (LL.B.)",
-    classOfDegree: "Second Class Honours (Upper Division)",
-    graduationYear: "2022",
-    dateOfIssue: "22nd August 2022",
-    senateApprovalDate: "15th July 2022",
-    status: "VERIFIED",
-    cryptographicHash: "f1409d6c49832aa68b2011400e998273b5a176210f88927e1fba734891cc8461",
-    qrSignature: "NSUK-SEC-SHA256-CHUKWUDIEZE-2022-VALIDATED",
-  },
-];
-
-// Helper to truncate text with more than 15 characters to stay strictly on one line
-const truncate15 = (str: string | undefined | null, maxLen: number = 15): string => {
-  if (!str) return "";
-  return str.length > maxLen ? `${str.slice(0, maxLen)}...` : str;
-};
-
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminDashboardTab>("overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [selectedPrintStudent, setSelectedPrintStudent] = useState<VerifiedCertificate | null>(null);
 
-  // Registry state initialized with authoritative records (starting with user sample)
-  const [certificates, setCertificates] = useState<VerifiedCertificate[]>(
-    INITIAL_STUDENT_RECORDS
-  );
+  // Live registry state fetched from database
+  const [certificates, setCertificates] = useState<VerifiedCertificate[]>([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState<boolean>(true);
+  const [isGeneratingCert, setIsGeneratingCert] = useState<string | null>(null);
+  const [isBatchGenerating, setIsBatchGenerating] = useState<boolean>(false);
+  const [stats, setStats] = useState({
+    total: 0,
+    issued: 0,
+    verified: 0,
+    pending: 0,
+    verifiedToday: 0,
+    totalPrinted: 0,
+  });
+
+  // Load students from database
+  const fetchStudentsFromDb = useCallback(async () => {
+    try {
+      setIsLoadingStudents(true);
+      const res = await fetch("/api/admin/students");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.students)) {
+        setCertificates(data.students);
+        if (data.stats) {
+          setStats(data.stats);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch students from DB:", err);
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  }, []);
+
+  // Currently logged-in admin profile
+  const [currentUser, setCurrentUser] = useState<{
+    name: string;
+    email?: string;
+    role?: string;
+    department?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    fetchStudentsFromDb();
+
+    async function loadAdminUser() {
+      try {
+        const res = await fetch("/api/admin/auth/me");
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          setCurrentUser(data.user);
+        }
+      } catch (err) {
+        console.warn("Failed to load admin user profile:", err);
+      }
+    }
+    loadAdminUser();
+  }, [fetchStudentsFromDb]);
 
   // Search, Filter & Pagination state for table
   const [searchQuery, setSearchQuery] = useState("");
   const [facultyFilter, setFacultyFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(4);
+  const [pageSize, setPageSize] = useState(10);
 
   // Edit & Delete modal states
   const [editingCert, setEditingCert] = useState<VerifiedCertificate | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<VerifiedCertificate>>({});
+  const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   const [deletingCert, setDeletingCert] = useState<VerifiedCertificate | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // State for QR preview modal
   const [previewCert, setPreviewCert] = useState<VerifiedCertificate | null>(null);
@@ -215,11 +148,12 @@ export default function AdminDashboardPage() {
   // Filtered records
   const filteredCertificates = useMemo(() => {
     return certificates.filter((cert) => {
+      const q = searchQuery.toLowerCase();
       const matchesSearch =
-        cert.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cert.certificateNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cert.matricNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cert.degreeAwarded.toLowerCase().includes(searchQuery.toLowerCase());
+        cert.fullName.toLowerCase().includes(q) ||
+        (cert.certificateNumber ? cert.certificateNumber.toLowerCase().includes(q) : false) ||
+        cert.matricNumber.toLowerCase().includes(q) ||
+        cert.degreeAwarded.toLowerCase().includes(q);
 
       const matchesFaculty =
         facultyFilter === "All" || cert.faculty === facultyFilter;
@@ -228,9 +162,14 @@ export default function AdminDashboardPage() {
     });
   }, [certificates, searchQuery, facultyFilter]);
 
+  // Count pending certificates
+  const pendingCertificatesCount = useMemo(() => {
+    return certificates.filter((c) => !c.certificateNumber).length;
+  }, [certificates]);
+
   // Distinct faculties for dropdown filter
   const facultiesList = useMemo(() => {
-    const set = new Set(certificates.map((c) => c.faculty));
+    const set = new Set(certificates.map((c) => c.faculty).filter(Boolean));
     return ["All", ...Array.from(set)];
   }, [certificates]);
 
@@ -241,53 +180,171 @@ export default function AdminDashboardPage() {
     return filteredCertificates.slice(start, start + pageSize);
   }, [filteredCertificates, currentPage, pageSize]);
 
+  // Generate certificate for a single student
+  const handleGenerateSingleCertificate = async (cert: VerifiedCertificate) => {
+    if (cert.certificateNumber) return;
+    setIsGeneratingCert(cert.matricNumber);
+    try {
+      const res = await fetch("/api/admin/certificates/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: cert.id, matricNumber: cert.matricNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to generate certificate");
+      }
+      const generatedNum = data.certificates?.[0]?.certificateNumber;
+      setTemplateNotice(
+        `Official Certificate generated for ${cert.fullName}! Assigned Number: ${generatedNum}`
+      );
+      await fetchStudentsFromDb();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error generating certificate";
+      setTemplateNotice(`Generation Error: ${msg}`);
+    } finally {
+      setIsGeneratingCert(null);
+    }
+  };
+
+  // Batch generate certificates for all pending students
+  const handleBatchGenerateCertificates = async () => {
+    const pending = certificates.filter((c) => !c.certificateNumber);
+    if (pending.length === 0) return;
+
+    setIsBatchGenerating(true);
+    try {
+      const res = await fetch("/api/admin/certificates/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentIds: pending.map((s) => s.id).filter(Boolean) }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to batch generate certificates");
+      }
+      setTemplateNotice(
+        `Successfully generated and registered official certificates for ${data.count} student(s)!`
+      );
+      await fetchStudentsFromDb();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error generating batch certificates";
+      setTemplateNotice(`Batch Error: ${msg}`);
+    } finally {
+      setIsBatchGenerating(false);
+    }
+  };
+
   // Edit record handlers
   const handleEditClick = (cert: VerifiedCertificate) => {
     setEditingCert(cert);
     setEditFormData({ ...cert });
+    setEditError(null);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCert) return;
-    setCertificates((prev) =>
-      prev.map((c) =>
-        c.certificateNumber === editingCert.certificateNumber
-          ? ({ ...c, ...editFormData } as VerifiedCertificate)
-          : c
-      )
-    );
-    setTemplateNotice(
-      `Record for ${editFormData.fullName || editingCert.fullName} has been successfully updated in the registry.`
-    );
-    setEditingCert(null);
+    try {
+      setIsSavingEdit(true);
+      setEditError(null);
+
+      const res = await fetch("/api/admin/students", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editFormData,
+          id: editingCert.id,
+          originalMatricNumber: editingCert.matricNumber,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update student record.");
+      }
+
+      const updated = data.student as VerifiedCertificate;
+      setCertificates((prev) =>
+        prev.map((c) =>
+          (c.id && updated.id && c.id === updated.id) ||
+          c.matricNumber === editingCert.matricNumber
+            ? { ...c, ...updated }
+            : c
+        )
+      );
+
+      setTemplateNotice(
+        data.message || `Record for ${updated.fullName || editingCert.fullName} has been updated.`
+      );
+      setEditingCert(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving student record";
+      setEditError(msg);
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   // Delete record handlers
   const handleDeleteClick = (cert: VerifiedCertificate) => {
     setDeletingCert(cert);
+    setDeleteError(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingCert) return;
-    setCertificates((prev) =>
-      prev.filter((c) => c.certificateNumber !== deletingCert.certificateNumber)
-    );
-    setTemplateNotice(
-      `Record ${deletingCert.certificateNumber} (${deletingCert.fullName}) removed from live registry.`
-    );
-    setDeletingCert(null);
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+
+      const url = deletingCert.id
+        ? `/api/admin/students?id=${encodeURIComponent(deletingCert.id)}`
+        : `/api/admin/students?matricNumber=${encodeURIComponent(deletingCert.matricNumber)}`;
+
+      const res = await fetch(url, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete student record.");
+      }
+
+      setCertificates((prev) =>
+        prev.filter((c) =>
+          deletingCert.id && c.id
+            ? c.id !== deletingCert.id
+            : c.matricNumber !== deletingCert.matricNumber
+        )
+      );
+
+      setStats((prev) => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        verified: deletingCert.status === "VERIFIED" ? Math.max(0, prev.verified - 1) : prev.verified,
+        pending: deletingCert.status === "PENDING" ? Math.max(0, prev.pending - 1) : prev.pending,
+      }));
+
+      setTemplateNotice(
+        data.message || `Record (${deletingCert.fullName}) removed from registry.`
+      );
+      setDeletingCert(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error deleting student record";
+      setDeleteError(msg);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  // Download Sample CSV helper
+  // Download Sample CSV helper - NO certificate number included!
   const handleDownloadSampleCSV = () => {
     const headers =
-      "Full Name,Matric Number,Certificate Number,Faculty,Department,Degree Awarded,Class of Degree,Graduation Year,Senate Approval Date\n";
+      "Full Name,Matric Number,Faculty,Department,Degree Awarded,Class of Degree,Graduation Year,Senate Approval Date\n";
     const sampleRows = [
-      "Ibrahim Danladi Musa,NSUK/NAS/CSC/20/1042,NSUK/SR-FT/2024/2025/1102,Faculty of Natural & Applied Sciences,Department of Computer Science,Bachelor of Science (B.Sc.) in Computer Science,First Class Honours,2024,28th October 2024",
-      "Fatima Aliyu Bello,NSUK/LAW/CIL/19/0312,NSUK/SR-FT/2024/2025/1103,Faculty of Law,Department of Common & Islamic Law,Bachelor of Laws (LL.B.),Second Class Honours (Upper Division),2024,28th October 2024",
-      "Emmanuel Chukwudi Eze,NSUK/ADM/BUS/20/0541,NSUK/SR-FT/2024/2025/1104,Faculty of Administration & Business,Department of Business Administration,Bachelor of Science (B.Sc.) in Business Administration,Second Class Honours (Upper Division),2024,28th October 2024",
-      "Zainab Abubakar Sadiq,NSUK/FAS/BCH/20/0819,NSUK/SR-FT/2024/2025/1105,Faculty of Natural & Applied Sciences,Department of Biochemistry,Bachelor of Science (B.Sc.) in Biochemistry,First Class Honours,2024,28th October 2024",
+      "Ibrahim Danladi Musa,NSUK/NAS/CSC/20/1042,Faculty of Natural & Applied Sciences,Department of Computer Science,Bachelor of Science (B.Sc.) in Computer Science,First Class Honours,2024,28th October 2024",
+      "Fatima Aliyu Bello,NSUK/LAW/CIL/19/0312,Faculty of Law,Department of Common & Islamic Law,Bachelor of Laws (LL.B.),Second Class Honours (Upper Division),2024,28th October 2024",
+      "Emmanuel Chukwudi Eze,NSUK/ADM/BUS/20/0541,Faculty of Administration & Business,Department of Business Administration,Bachelor of Science (B.Sc.) in Business Administration,Second Class Honours (Upper Division),2024,28th October 2024",
+      "Zainab Abubakar Sadiq,NSUK/FAS/BCH/20/0819,Faculty of Natural & Applied Sciences,Department of Biochemistry,Bachelor of Science (B.Sc.) in Biochemistry,First Class Honours,2024,28th October 2024",
     ].join("\n");
 
     const blob = new Blob([headers + sampleRows], {
@@ -296,7 +353,7 @@ export default function AdminDashboardPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", "nsuk_sample_students.csv");
+    link.setAttribute("download", "nsuk_students_upload_template.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -329,7 +386,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Process CSV File
+  // Process CSV File (Without Certificate Number)
   const processCsvFile = (file: File) => {
     setCsvError(null);
     setImportSuccessCount(null);
@@ -358,24 +415,18 @@ export default function AdminDashboardPage() {
         // Parse data rows (skipping header)
         const parsed: VerifiedCertificate[] = [];
         for (let i = 1; i < lines.length; i++) {
-          const parts = lines[i].split(",").map((p) => p.trim());
-          if (parts.length >= 7) {
+          const parts = lines[i].split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
+          if (parts.length >= 2) {
             const fullName = parts[0];
             const matricNumber = parts[1];
-            const certNum = parts[2] || `NSUK/SR-FT/${2024}/${Math.floor(1000 + Math.random() * 9000)}`;
-            const faculty = parts[3] || "Faculty of Natural & Applied Sciences";
-            const department = parts[4] || "Department of Academic Registry";
-            const degreeAwarded = parts[5] || "Bachelor of Science (B.Sc.)";
-            const classOfDegree = parts[6] || "Second Class Honours (Upper Division)";
-            const graduationYear = parts[7] || "2024";
-            const senateApprovalDate = parts[8] || "28th October 2024";
-
-            const mockHash = Array.from({ length: 64 }, () =>
-              Math.floor(Math.random() * 16).toString(16)
-            ).join("");
+            const faculty = parts[2] || "Faculty of Natural & Applied Sciences";
+            const department = parts[3] || "Department of Academic Registry";
+            const degreeAwarded = parts[4] || "Bachelor of Science (B.Sc.)";
+            const classOfDegree = parts[5] || "Second Class Honours (Upper Division)";
+            const graduationYear = parts[6] || "2024";
+            const senateApprovalDate = parts[7] || "28th October 2024";
 
             parsed.push({
-              certificateNumber: certNum,
               matricNumber,
               fullName,
               faculty,
@@ -383,15 +434,12 @@ export default function AdminDashboardPage() {
               degreeAwarded,
               classOfDegree,
               graduationYear,
-              dateOfIssue: new Date().toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              }),
               senateApprovalDate,
-              status: "VERIFIED",
-              cryptographicHash: mockHash,
-              qrSignature: `NSUK-SEC-SHA256-${certNum.replace(/\//g, "-")}`,
+              certificateNumber: null, // As specified: NO certificate number upon upload!
+              status: "PENDING",
+              cryptographicHash: null,
+              qrSignature: null,
+              dateOfIssue: null,
             });
           }
         }
@@ -408,24 +456,62 @@ export default function AdminDashboardPage() {
     reader.readAsText(file);
   };
 
-  // Confirm Import
-  const handleConfirmImport = () => {
-    if (parsedStudents.length === 0) return;
+  // Confirm Import via Real API
+  const handleConfirmImport = async () => {
+    if (!csvFile && parsedStudents.length === 0) return;
 
     setIsImporting(true);
-    setTimeout(() => {
-      setCertificates((prev) => [...parsedStudents, ...prev]);
-      setImportSuccessCount(parsedStudents.length);
-      setIsImporting(false);
+    setCsvError(null);
+
+    try {
+      let res;
+      if (csvFile) {
+        const formData = new FormData();
+        formData.append("file", csvFile);
+        res = await fetch("/api/admin/students/upload", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await fetch("/api/admin/students/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ students: parsedStudents }),
+        });
+      }
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to upload students to database");
+      }
+
+      const count = (data.insertedCount || 0) + (data.updatedCount || 0);
+      setImportSuccessCount(count);
+      setTemplateNotice(data.message || `Successfully registered ${count} students in database!`);
       setParsedStudents([]);
       setCsvFile(null);
-    }, 1000);
+      await fetchStudentsFromDb();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error uploading CSV file";
+      setCsvError(msg);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedHash(true);
     setTimeout(() => setCopiedHash(false), 2000);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await fetch("/api/admin/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+    router.push("/admin");
   };
 
   return (
@@ -437,6 +523,8 @@ export default function AdminDashboardPage() {
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         recordsCount={certificates.length}
+        currentUser={currentUser}
+        onSignOut={handleSignOut}
       />
 
       {/* 2. Main Content Area */}
@@ -470,7 +558,10 @@ export default function AdminDashboardPage() {
               size="sm"
               variant="primary"
               leftIcon={<Printer className="h-4 w-4" />}
-              onClick={() => setIsPrintModalOpen(true)}
+              onClick={() => {
+                setSelectedPrintStudent(null);
+                setIsPrintModalOpen(true);
+              }}
             >
               Print Certificate
             </Button>
@@ -548,21 +639,26 @@ export default function AdminDashboardPage() {
           {activeTab === "overview" && (
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Summary Metrics Section (ONLY VISIBLE ON DASHBOARD OVERVIEW) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
                 <StatsCard
-                  title="Total Certificates"
-                  value={(14820 + certificates.length).toLocaleString()}
+                  title="Total Students"
+                  value={stats.total ? stats.total.toLocaleString() : certificates.length.toLocaleString()}
+                  icon={Users}
+                />
+                <StatsCard
+                  title="Issued Certificates"
+                  value={(stats.issued || certificates.filter((c) => Boolean(c.certificateNumber)).length).toLocaleString()}
                   icon={Award}
                 />
                 <StatsCard
-                  title="Verified Today"
-                  value="248"
-                  icon={CheckCircle2}
+                  title="Pending Issuance"
+                  value={(stats.pending !== undefined ? stats.pending : certificates.filter((c) => !c.certificateNumber).length).toLocaleString()}
+                  icon={Sparkles}
                 />
                 <StatsCard
-                  title="Uploaded Students"
-                  value={(32450 + certificates.length).toLocaleString()}
-                  icon={Users}
+                  title="Verified Today"
+                  value={(stats.verifiedToday || 0).toLocaleString()}
+                  icon={CheckCircle2}
                 />
               </div>
 
@@ -588,47 +684,56 @@ export default function AdminDashboardPage() {
                     </Button>
                   </div>
 
-                  <div className="divide-y divide-slate-100">
-                    {certificates.slice(0, 4).map((cert) => (
-                      <div
-                        key={cert.certificateNumber}
-                        className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group hover:bg-slate-50/50 px-2 rounded-xl transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800 font-mono text-xs font-bold ring-1 ring-emerald-800/15 shrink-0">
-                            NSUK
+                    <div className="divide-y divide-slate-100">
+                      {certificates.slice(0, 4).map((cert) => (
+                        <div
+                          key={cert.id || cert.matricNumber}
+                          className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group hover:bg-slate-50/50 px-2 rounded-xl transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800 font-mono text-xs font-bold ring-1 ring-emerald-800/15 shrink-0">
+                              NSUK
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">
+                                {cert.fullName}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                <span className="font-mono text-emerald-800 font-semibold">
+                                  {cert.certificateNumber || "Pending Issuance"}
+                                </span>{" "}
+                                &bull; {cert.degreeAwarded}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900">
-                              {cert.fullName}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              <span className="font-mono text-emerald-800 font-semibold">
-                                {cert.certificateNumber}
-                              </span>{" "}
-                              &bull; {cert.degreeAwarded}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="flex items-center gap-3 self-end sm:self-center">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                            Active
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPreviewCert(cert)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:text-emerald-800 hover:bg-emerald-50 transition-colors cursor-pointer"
-                            title="Preview QR Seal"
-                          >
-                            <QrCode className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            {cert.certificateNumber ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                                Issued
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                Pending
+                              </span>
+                            )}
+                            {cert.certificateNumber && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewCert(cert)}
+                                className="rounded-lg p-1.5 text-slate-400 hover:text-emerald-800 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                title="View QR Details"
+                              >
+                                <QrCode className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
 
                 {/* Quick Upload Action Panel */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between">
@@ -836,7 +941,7 @@ export default function AdminDashboardPage() {
                           <tr className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-bold uppercase tracking-wider text-slate-600">
                             <th className="py-2.5 px-3">Full Name</th>
                             <th className="py-2.5 px-3">Matric #</th>
-                            <th className="py-2.5 px-3">Certificate #</th>
+                            <th className="py-2.5 px-3">Faculty</th>
                             <th className="py-2.5 px-3">Programme</th>
                             <th className="py-2.5 px-3">Class</th>
                           </tr>
@@ -845,28 +950,28 @@ export default function AdminDashboardPage() {
                           {parsedStudents.map((s, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/50">
                               <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
-                                <span title={s.fullName} className="block truncate max-w-[140px]">
-                                  {truncate15(s.fullName, 15)}
+                                <span title={s.fullName} className="block truncate max-w-[180px]">
+                                  {s.fullName}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">
-                                <span title={s.matricNumber} className="block truncate max-w-[130px]">
-                                  {truncate15(s.matricNumber, 15)}
+                                <span title={s.matricNumber} className="block truncate max-w-[140px]">
+                                  {s.matricNumber}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 font-mono font-bold text-emerald-950 whitespace-nowrap">
-                                <span title={s.certificateNumber} className="block truncate max-w-[140px]">
-                                  {truncate15(s.certificateNumber, 15)}
+                              <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                                <span title={s.faculty} className="block truncate max-w-[160px]">
+                                  {s.faculty}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap">
-                                <span title={s.degreeAwarded} className="block truncate max-w-[160px]">
-                                  {truncate15(s.degreeAwarded, 15)}
+                                <span title={s.degreeAwarded} className="block truncate max-w-[180px]">
+                                  {s.degreeAwarded}
                                 </span>
                               </td>
                               <td className="py-2.5 px-3 text-emerald-800 font-medium whitespace-nowrap">
-                                <span title={s.classOfDegree} className="block truncate max-w-[130px]">
-                                  {truncate15(s.classOfDegree, 15)}
+                                <span title={s.classOfDegree} className="block truncate max-w-[140px]">
+                                  {s.classOfDegree}
                                 </span>
                               </td>
                             </tr>
@@ -928,8 +1033,22 @@ export default function AdminDashboardPage() {
                     />
                   </div>
 
-                  {/* Faculty Filter */}
-                  <div className="flex items-center gap-2">
+                  {/* Faculty Filter & Actions Header */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {pendingCertificatesCount > 0 && (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        isLoading={isBatchGenerating}
+                        onClick={handleBatchGenerateCertificates}
+                        leftIcon={<Sparkles className="h-3.5 w-3.5" />}
+                        title="Generate official certificate numbers for all pending students"
+                      >
+                        Generate Pending ({pendingCertificatesCount})
+                      </Button>
+                    )}
+
                     <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold shrink-0">
                       <Filter className="h-3.5 w-3.5 text-emerald-800" />
                       <span>Faculty:</span>
@@ -948,6 +1067,15 @@ export default function AdminDashboardPage() {
                         </option>
                       ))}
                     </select>
+
+                    <button
+                      type="button"
+                      onClick={fetchStudentsFromDb}
+                      className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+                      title="Refresh from Database"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isLoadingStudents ? "animate-spin text-emerald-800" : ""}`} />
+                    </button>
                   </div>
                 </div>
 
@@ -972,7 +1100,7 @@ export default function AdminDashboardPage() {
                             <div className="flex flex-col items-center justify-center gap-2">
                               <FileText className="h-8 w-8 text-slate-300" />
                               <p className="font-semibold text-slate-700">
-                                No certificate records match your search criteria.
+                                {isLoadingStudents ? "Loading records from database..." : "No certificate records match your search criteria."}
                               </p>
                               <button
                                 type="button"
@@ -993,7 +1121,7 @@ export default function AdminDashboardPage() {
                           const serialNumber = (currentPage - 1) * pageSize + index + 1;
                           return (
                             <tr
-                              key={cert.certificateNumber}
+                              key={cert.id || cert.matricNumber}
                               className="hover:bg-slate-50/70 transition-colors"
                             >
                               {/* S/N */}
@@ -1001,54 +1129,96 @@ export default function AdminDashboardPage() {
                                 {serialNumber}
                               </td>
 
-                              {/* FULL NAME - Truncate if > 15 chars to stay strictly on one line */}
+                              {/* FULL NAME */}
                               <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
-                                <div title={cert.fullName} className="max-w-[170px]">
+                                <div title={cert.fullName} className="max-w-[240px]">
                                   <span className="font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap truncate block">
-                                    {truncate15(cert.fullName, 15)}
+                                    {cert.fullName}
                                   </span>
                                 </div>
                               </td>
 
-                              {/* MATRIC # - Truncate if > 15 chars to stay strictly on one line */}
+                              {/* MATRIC # */}
                               <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
-                                <div title={cert.matricNumber} className="max-w-[160px]">
-                                  <span className="text-slate-500 font-normal font-mono text-xs sm:text-[13px] whitespace-nowrap truncate block">
-                                    {truncate15(cert.matricNumber, 15)}
+                                <div title={cert.matricNumber} className="max-w-[170px]">
+                                  <span className="text-slate-600 font-normal font-mono text-xs sm:text-[13px] whitespace-nowrap truncate block">
+                                    {cert.matricNumber}
                                   </span>
                                 </div>
                               </td>
 
-                              {/* CERTIFICATE # - Truncate if > 15 chars to stay strictly on one line */}
+                              {/* CERTIFICATE # */}
                               <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
-                                <div title={cert.certificateNumber} className="max-w-[170px]">
-                                  <span className="font-bold text-slate-900 font-mono text-xs sm:text-[13px] whitespace-nowrap truncate block">
-                                    {truncate15(cert.certificateNumber, 15)}
+                                {cert.certificateNumber ? (
+                                  <div title={cert.certificateNumber} className="max-w-[210px]">
+                                    <span className="font-bold text-slate-900 font-mono text-xs sm:text-[13px] whitespace-nowrap truncate block">
+                                      {cert.certificateNumber}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                    Pending Issuance
                                   </span>
-                                </div>
+                                )}
                               </td>
 
-                              {/* PROGRAMME - Truncate if > 15 chars to stay strictly on one line */}
+                              {/* PROGRAMME */}
                               <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
-                                <div title={cert.degreeAwarded} className="max-w-[180px]">
+                                <div title={cert.degreeAwarded} className="max-w-[220px]">
                                   <span className="text-slate-600 text-xs sm:text-[13px] whitespace-nowrap truncate block">
-                                    {truncate15(cert.degreeAwarded, 15)}
+                                    {cert.degreeAwarded}
                                   </span>
                                 </div>
                               </td>
 
-                              {/* CLASS - Truncate if > 15 chars to stay strictly on one line */}
+                              {/* CLASS */}
                               <td className="py-4 px-4 sm:px-6 whitespace-nowrap">
-                                <div title={cert.classOfDegree} className="max-w-[160px]">
+                                <div title={cert.classOfDegree} className="max-w-[190px]">
                                   <span className="text-emerald-800 font-semibold text-xs sm:text-[13px] whitespace-nowrap truncate block">
-                                    {truncate15(cert.classOfDegree, 15)}
+                                    {cert.classOfDegree}
                                   </span>
                                 </div>
                               </td>
 
-                              {/* ACTION: Edit & Delete icons */}
+                              {/* ACTION */}
                               <td className="py-4 px-4 sm:px-6 text-center whitespace-nowrap">
-                                <div className="flex items-center justify-center gap-1">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {!cert.certificateNumber ? (
+                                    <Button
+                                      type="button"
+                                      variant="primary"
+                                      size="xs"
+                                      isLoading={isGeneratingCert === cert.matricNumber}
+                                      onClick={() => handleGenerateSingleCertificate(cert)}
+                                      leftIcon={<Sparkles className="h-3 w-3" />}
+                                      title="Generate official certificate number and cryptographic signature"
+                                    >
+                                      Generate
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewCert(cert)}
+                                        className="p-1.5 rounded-lg text-emerald-800 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                        title="View QR Seal & Details"
+                                      >
+                                        <QrCode className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedPrintStudent(cert);
+                                          setIsPrintModalOpen(true);
+                                        }}
+                                        className="p-1.5 rounded-lg text-emerald-800 hover:bg-emerald-50 transition-colors cursor-pointer"
+                                        title="Print Official Certificate"
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                      </button>
+                                    </>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => handleEditClick(cert)}
@@ -1170,8 +1340,12 @@ export default function AdminDashboardPage() {
       {/* Print Official Certificate Modal */}
       <PrintCertificateModal
         isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
+        onClose={() => {
+          setIsPrintModalOpen(false);
+          setSelectedPrintStudent(null);
+        }}
         students={certificates}
+        initialStudent={selectedPrintStudent}
       />
 
       {/* QR & Security Record Preview Modal */}
@@ -1225,7 +1399,7 @@ export default function AdminDashboardPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard(previewCert.cryptographicHash)}
+                    onClick={() => copyToClipboard(previewCert.cryptographicHash || "")}
                     className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 hover:text-emerald-950"
                   >
                     {copiedHash ? (
@@ -1242,7 +1416,7 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
                 <p className="font-mono text-[10px] text-slate-600 break-all leading-relaxed">
-                  {previewCert.cryptographicHash}
+                  {previewCert.cryptographicHash || "Cryptographic hash will be generated upon certificate issuance."}
                 </p>
               </div>
 
@@ -1255,20 +1429,22 @@ export default function AdminDashboardPage() {
                 >
                   Close
                 </Button>
-                <Link
-                  href={`/verify/${encodeURIComponent(
-                    previewCert.certificateNumber.replace(/\//g, "-")
-                  )}`}
-                  target="_blank"
-                >
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    rightIcon={<ExternalLink className="h-3.5 w-3.5" />}
+                {previewCert.certificateNumber && (
+                  <Link
+                    href={`/verify/${encodeURIComponent(
+                      previewCert.certificateNumber.replace(/\//g, "-")
+                    )}`}
+                    target="_blank"
                   >
-                    Open in Verification Portal
-                  </Button>
-                </Link>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      rightIcon={<ExternalLink className="h-3.5 w-3.5" />}
+                    >
+                      Open in Verification Portal
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -1300,6 +1476,13 @@ export default function AdminDashboardPage() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+              {editError && (
+                <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700 border border-red-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="Full Name"
@@ -1319,11 +1502,11 @@ export default function AdminDashboardPage() {
                 />
                 <Input
                   label="Certificate Number"
+                  placeholder="e.g. NSUK/SR-FT/2024/2025/1102"
                   value={editFormData.certificateNumber || ""}
                   onChange={(e) =>
                     setEditFormData({ ...editFormData, certificateNumber: e.target.value })
                   }
-                  required
                 />
                 <Input
                   label="Class of Degree"
@@ -1359,12 +1542,47 @@ export default function AdminDashboardPage() {
                   }
                   required
                 />
+                <Input
+                  label="Graduation Year"
+                  value={editFormData.graduationYear || ""}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, graduationYear: e.target.value })
+                  }
+                />
+                <Input
+                  label="Senate Approval Date"
+                  value={editFormData.senateApprovalDate || ""}
+                  onChange={(e) =>
+                    setEditFormData({ ...editFormData, senateApprovalDate: e.target.value })
+                  }
+                />
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Record Verification Status
+                  </label>
+                  <select
+                    value={editFormData.status || "VERIFIED"}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        status: e.target.value as "PENDING" | "VERIFIED" | "SUSPENDED" | "REVOKED",
+                      })
+                    }
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 px-3 text-xs font-medium text-slate-800 focus:border-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-700/20"
+                  >
+                    <option value="VERIFIED">VERIFIED (Official Valid Graduate)</option>
+                    <option value="PENDING">PENDING (Awaiting Certificate Generation)</option>
+                    <option value="SUSPENDED">SUSPENDED (Temporarily Held)</option>
+                    <option value="REVOKED">REVOKED (Discredited / Cancelled)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={isSavingEdit}
                   onClick={() => setEditingCert(null)}
                 >
                   Cancel
@@ -1372,6 +1590,7 @@ export default function AdminDashboardPage() {
                 <Button
                   type="submit"
                   variant="primary"
+                  isLoading={isSavingEdit}
                   leftIcon={<Check className="h-4 w-4" />}
                 >
                   Save Changes
@@ -1398,10 +1617,16 @@ export default function AdminDashboardPage() {
                   Are you sure you want to permanently delete the graduate record for{" "}
                   <strong className="text-slate-900">{deletingCert.fullName}</strong> (
                   <span className="font-mono text-emerald-800 font-semibold">
-                    {deletingCert.certificateNumber}
+                    {deletingCert.certificateNumber || deletingCert.matricNumber}
                   </span>
-                  )? This credential will be removed from the official central register.
+                  )? This credential will be completely removed from the official Senate database.
                 </p>
+                {deleteError && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-red-50 p-2.5 text-xs font-semibold text-red-700 border border-red-200">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{deleteError}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1409,6 +1634,7 @@ export default function AdminDashboardPage() {
               <Button
                 type="button"
                 variant="outline"
+                disabled={isDeleting}
                 onClick={() => setDeletingCert(null)}
               >
                 Cancel
@@ -1416,6 +1642,7 @@ export default function AdminDashboardPage() {
               <Button
                 type="button"
                 variant="danger"
+                isLoading={isDeleting}
                 leftIcon={<Trash2 className="h-4 w-4" />}
                 onClick={handleConfirmDelete}
               >

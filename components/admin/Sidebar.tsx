@@ -15,6 +15,13 @@ import {
 
 export type AdminDashboardTab = "records" | "issue" | "overview";
 
+export interface SidebarOfficerUser {
+  name: string;
+  email?: string;
+  role?: string;
+  department?: string | null;
+}
+
 export interface SidebarProps {
   /** Current active navigation tab */
   activeTab: AdminDashboardTab;
@@ -28,6 +35,8 @@ export interface SidebarProps {
   onSignOut?: () => void;
   /** Total records count badge */
   recordsCount?: number;
+  /** Currently logged in admin profile */
+  currentUser?: SidebarOfficerUser | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -37,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   onSignOut,
   recordsCount = 0,
+  currentUser = null,
 }) => {
   const handleNavClick = (tab: AdminDashboardTab) => {
     onSelectTab(tab);
@@ -188,15 +198,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Officer Profile & Sign-Out Section */}
         <div className="border-t border-slate-200/80 bg-slate-50/70 p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-800 text-white font-bold text-xs shadow-xs">
-              <UserCheck className="h-4 w-4 text-emerald-300" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-800 text-white font-bold text-xs shadow-xs uppercase">
+              {currentUser?.name ? (
+                currentUser.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((n) => n[0])
+                  .join("")
+              ) : (
+                <UserCheck className="h-4 w-4 text-emerald-300" />
+              )}
             </div>
             <div className="overflow-hidden">
-              <p className="truncate text-xs font-bold text-slate-900">
-                Dr. Al-Hassan Mohammed
+              <p
+                className="truncate text-xs font-bold text-slate-900"
+                title={currentUser?.name || "Dr. Al-Hassan Mohammed"}
+              >
+                {currentUser?.name || "Dr. Al-Hassan Mohammed"}
               </p>
-              <p className="text-[10px] text-slate-500 truncate">
-                Deputy Registrar (Academic Affairs)
+              <p
+                className="text-[10px] text-slate-500 truncate"
+                title={
+                  currentUser?.role === "REGISTRAR"
+                    ? "Deputy Registrar (Academic Affairs)"
+                    : currentUser?.role === "SUPER_ADMIN"
+                    ? "Super Administrator (Senate)"
+                    : currentUser?.department || currentUser?.role || "Academic Registry Officer"
+                }
+              >
+                {currentUser?.role === "REGISTRAR"
+                  ? "Deputy Registrar (Academic Affairs)"
+                  : currentUser?.role === "SUPER_ADMIN"
+                  ? "Super Administrator (Senate)"
+                  : currentUser?.department || currentUser?.role || "Academic Registry Officer"}
               </p>
             </div>
           </div>

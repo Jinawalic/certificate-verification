@@ -1,0 +1,81 @@
+// Prisma Schema for Nasarawa State University, Keffi - Certificate Verification System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Model representing official academic certificates & statements of result
+model Certificate {
+  id                 String            @id @default(cuid())
+  certificateNumber  String?           @unique
+  matricNumber       String            @unique
+  fullName           String
+  faculty            String
+  department         String
+  degreeAwarded      String
+  classOfDegree      String
+  graduationYear     String
+  dateOfIssue        String?
+  senateApprovalDate String?
+  status             String            @default("PENDING") // PENDING, VERIFIED, SUSPENDED, REVOKED
+  cryptographicHash  String?
+  qrSignature        String?
+  studentPhotoUrl    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  // Verification audit logs relation
+  verifications      VerificationLog[]
+
+  @@index([certificateNumber])
+  @@index([matricNumber])
+  @@index([fullName])
+  @@index([faculty])
+  @@index([department])
+}
+
+// Model for logging each verification attempt (public portal & admin queries)
+model VerificationLog {
+  id            String       @id @default(cuid())
+  certificateId String?
+  certificate   Certificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+  query         String
+  status        String       // SUCCESS, NOT_FOUND, FLAGGED
+  ipAddress     String?
+  userAgent     String?
+  verifiedAt    DateTime     @default(now())
+
+  @@index([query])
+  @@index([verifiedAt])
+}
+
+// Model for University Registry & Senate Officers
+model AdminUser {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String?
+  role         String   @default("OFFICER") // SUPER_ADMIN, REGISTRAR, OFFICER
+  department   String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([email])
+}
+
+// Model for managing uploaded certificate templates & printing configurations
+model CertificateTemplate {
+  id         String   @id @default(cuid())
+  name       String
+  fileUrl    String
+  session    String?  // e.g. "2023/2024"
+  isActive   Boolean  @default(true)
+  uploadedBy String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

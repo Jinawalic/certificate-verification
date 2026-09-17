@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, FormEvent } from "react";
-import { Search, ArrowRight, AlertCircle } from "lucide-react";
+import { Search, ArrowRight, AlertCircle, Camera, Upload, ShieldCheck } from "lucide-react";
 import { SearchVerificationModal } from "./SearchVerificationModal";
+import { UploadCertificateModal } from "./UploadCertificateModal";
+import { VerifiedCertificate } from "@/lib/verification";
 
 export interface SearchBarProps {
   /** Initial certificate number value if any */
@@ -21,15 +23,21 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   initialValue = "",
   placeholder = "FT/2023/2024/2543",
   onSearch,
+  showQuickSamples = true,
 }) => {
   const [searchTerm, setSearchTerm] = useState(initialValue);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [verifiedRecord, setVerifiedRecord] = useState<string>("");
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const handleExecuteSearch = (idToSearch: string) => {
-    const trimmed = idToSearch.trim();
+  // Result states
+  const [verifiedRecordTerm, setVerifiedRecordTerm] = useState<string>("");
+  const [verifiedCertificate, setVerifiedCertificate] = useState<VerifiedCertificate | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  const handleExecuteSearch = async (rawInput: string) => {
+    const trimmed = rawInput.trim();
 
     if (!trimmed) {
       setErrorMessage("Please enter a valid certificate number or matriculation ID.");
@@ -37,6 +45,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     }
 
     setErrorMessage(null);
+    setModalError(null);
     setIsLoading(true);
 
     const prefix = "NSUK/SR";
@@ -44,15 +53,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       ? trimmed
       : `${prefix}/${trimmed.replace(/^\//, "")}`;
 
+    setVerifiedRecordTerm(cleanedTerm);
+
     if (onSearch) {
       onSearch(cleanedTerm);
     }
 
-    setTimeout(() => {
+    try {
+      // Query backend verification API
+      const res = await fetch(`/api/verify/${encodeURIComponent(cleanedTerm)}`);
+      const data = await res.json();
+
+      if (!res.ok || !data.success || !data.certificate) {
+        setVerifiedCertificate(null);
+        setModalError(
+          data.error ||
+          `No official academic record matching "${cleanedTerm}" exists in the Senate Central Register.`
+        );
+      } else {
+        setVerifiedCertificate(data.certificate);
+        setModalError(null);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification query failed.";
+      setVerifiedCertificate(null);
+      setModalError(msg);
+    } finally {
       setIsLoading(false);
-      setVerifiedRecord(cleanedTerm);
       setIsModalOpen(true);
-    }, 300);
+    }
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -63,17 +92,16 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
       {/* Clean Card Container */}
-      <div className="relative rounded-2xl bg-white p-4 sm:p-6 ring-1 ring-emerald-900/10 transition-all shadow-xs">
+      <div className="relative rounded-2xl bg-white p-4 sm:p-6 ring-1 ring-emerald-900/10 transition-all shadow-sm">
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             {/* Input Field with NSUK/SR Prefix */}
             <div
-              className={`relative flex-1 flex items-center rounded-xl border bg-slate-50/50 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-700 ${
-                errorMessage
+              className={`relative flex-1 flex items-center rounded-xl border bg-slate-50/50 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-700 ${errorMessage
                   ? "border-red-400 focus-within:border-red-500 focus-within:ring-red-200"
                   : "border-slate-200 focus-within:border-emerald-700"
-              }`}
+                }`}
             >
               <div className="pointer-events-none flex items-center pl-4 text-slate-400">
                 <Search className="h-5 w-5 text-emerald-800/60" />
@@ -101,7 +129,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-1 disabled:opacity-70 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+                className="inline-flex flex-1 sm:flex-initial items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm sm:text-base font-semibold text-white transition-all hover:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:ring-offset-1 disabled:opacity-70 disabled:cursor-not-allowed shrink-0 cursor-pointer shadow-xs"
               >
                 {isLoading ? (
                   <>
@@ -128,14 +156,23 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </form>
       </div>
 
-      {/* Identical Verification Modal Pop-up on Search */}
+      {/* Verification Modal displaying Certificate Image with Details */}
       <SearchVerificationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        certificateNumber={verifiedRecord}
+        certificateNumber={verifiedRecordTerm}
+        certificate={verifiedCertificate}
+        isLoading={isLoading}
+        errorMessage={modalError}
         onSearchAnother={() => {
           setSearchTerm("");
         }}
+      />
+
+      {/* Snap / Upload Certificate Modal */}
+      <UploadCertificateModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
       />
     </div>
   );

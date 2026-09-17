@@ -21,6 +21,14 @@ export const StatementOfResultTemplate: React.FC<StatementOfResultProps> = ({
     className = "",
     id,
 }) => {
+    // Format serial number cleanly without redundant prefixing
+    const cleanSerial = serialNumber.trim();
+    const displaySerial = cleanSerial.startsWith("NSUK/SR")
+        ? cleanSerial
+        : cleanSerial
+        ? `NSUK/SR-${cleanSerial.replace(/^[-/]+/, "")}`
+        : "";
+
     return (
         <div
             id={id}
@@ -31,7 +39,7 @@ export const StatementOfResultTemplate: React.FC<StatementOfResultProps> = ({
             {/* Top Serial Number Area */}
             <div className="absolute top-[95px] right-[85px]">
                 <span className="font-mono text-xs font-bold text-slate-900 tracking-wider">
-                    NSUK/SR-{serialNumber}
+                    {displaySerial}
                 </span>
             </div>
 

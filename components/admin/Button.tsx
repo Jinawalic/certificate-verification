@@ -4,7 +4,7 @@ import React, { ButtonHTMLAttributes, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "outline" | "ghost";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "xs" | "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Visual variant */
@@ -35,6 +35,7 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
+  xs: "px-2 py-1 text-[11px] rounded-lg gap-1 font-semibold",
   sm: "px-3 py-1.5 text-xs rounded-lg gap-1.5",
   md: "px-4 py-2.5 text-sm rounded-xl gap-2",
   lg: "px-6 py-3 text-base rounded-xl gap-2.5 font-bold",
